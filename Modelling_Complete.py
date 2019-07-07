@@ -360,111 +360,16 @@ lgbm_model = lgbm.LGBMRegressor(num_leaves=105, learning_rate =0.01, lambda_l1=0
                                 colsample_bytree = 0.46, max_bin=900)
 
 
-lr_model = LinearRegression()
-
-np.mean(cross_val_score(lgbm_model, x_values, np.log(y_values), scoring='neg_mean_squared_log_error', cv=3))
-
-
-lgbm_model.fit(x_values, np.log(y_values))
-lgbm.plot_importance(lgbm_model, max_num_features=30)
-
-
-
-
-rf_model = RandomForestRegressor(n_estimators=1200, min_samples_leaf=1, max_features=45)
-rf_model.fit(x_values, y_values)
-feature_imp = pd.DataFrame({'variable': x_values.columns,
-                            'importance': rf_model.feature_importances_})
-feature_imp.sort_values(by='importance', ascending=False, inplace=True) 
-gb_model = GradientBoostingRegressor(learning_rate =0.01, n_estimators=1000,
-                                     max_depth=10, loss='huber', max_features=45)
-
-xgb1 = xgb.XGBRegressor(learning_rate = 0.1, n_estimators = 1320, max_depth=6,
-                        min_child_weight=10, colsample_bytree=0.5, reg_lambda=0.0001)
-xgb1.fit(x_values, np.log(y_values))
-
-
 train_predictions = pd.DataFrame({'predictions': lgbm_model.predict(x_values)})
 train_predictions = pd.concat([train_data, train_predictions, y_values], axis=1)
 train_predictions.to_csv("E:/Kaggle_Problem/Flight Ticket Prediction/train_predict.csv", index=False)
 
-[col for col in x_values.columns if col not in test_data.columns]
 
 test_data = pd.get_dummies(test_data)
 test_data.fillna(0, inplace=True)
 
-lr_model.fit(x_values, np.log(y_values))
-
-
 predictions = pd.DataFrame(lgbm_model.predict(test_data))
 predictions.to_csv("E:/Kaggle_Problem/Flight Ticket Prediction/01042019_v3.csv", index=False)
-predictions = pd.DataFrame(xgb1.predict(test_data))
-predictions.to_csv("E:/Kaggle_Problem/Flight Ticket Prediction/01042019_v4.csv", index=False)
-
-
-
-
-
-
-############ Model Stacking ####################
-def stacking(model, x_train, y_train, x_test, n_fold):
-    print(model)
-    folds=StratifiedKFold(n_splits=n_fold, random_state=1)
-    train_pred = []
-    train_actuals = []
-    for train_indices, val_indices in folds.split(x_train, y_train.values):
-        x_train_subset, x_val = x_train.iloc[train_indices], x_train.iloc[val_indices]
-        y_train_subset,  y_val = y_train.iloc[train_indices], y_train.iloc[val_indices]
-
-        model.fit(X=x_train_subset, y=y_train_subset)
-        train_pred.extend(model.predict(x_val))
-        train_actuals.extend(y_val)
-    model.fit(x_train, y_train)
-    test_pred = model.predict(x_test)
-    return train_pred, train_actuals, test_pred
-
-
-x_train, x_test, y_train, y_test = train_test_split(x_values, y_values, test_size=0.25, random_state=100)
-
-
-
-test_data.fillna(0, inplace=True)
-x_values.fillna(0, inplace=True)
-
-lgbm_train, lgbm_actuals, lgbm_test = stacking(lgbm_model, x_values, np.log(y_values), test_data, 5)
-xgb_train, xgb_actuals, xgb_test = stacking(xgb1, x_values, np.log(y_values), test_data, 5)
-gbm_train, gbm_actuals, gbm_test = stacking(gb_model, x_values, y_values, test_data, 5)
-rf_train, rf_actuals, rf_test = stacking(rf_model, x_values, y_values, test_data, 5)
-lr_train, lr_actuals, lr_test = stacking(lr_model, x_values, y_values, test_data, 5)
-
-
-train_dataframe = pd.DataFrame(
-        {'lgbm': lgbm_train, 'gbm': xgb_train, 'actuals': lgbm_actuals})
-
-train_dataframe = pd.DataFrame(
-        {'lgbm': lgbm_train, 'lr': lr_train, 'actuals': lgbm_actuals})
-  
-test_dataframe = pd.DataFrame({'lgbm': lgbm_test, 'gbm': xgb_test})
-train_dataframe.to_csv("E:/Kaggle_Problem/Flight Ticket Prediction/meta_train.csv", index=False)
-test_dataframe.to_csv("E:/Kaggle_Problem/Flight Ticket Prediction/meta_test.csv", index=False)
-
-train_dataframe = pd.read_csv("E:/Kaggle_Problem/Flight Ticket Prediction/meta_train.csv")
-test_dataframe = pd.read_csv("E:/Kaggle_Problem/Flight Ticket Prediction/meta_test.csv")
-
-
-
-meta_model = lgbm.LGBMRegressor(learning_rate=0.01, n_estimators=500, num_leaves=25)
-meta_model = LinearRegression()
-meta_model.fit(train_dataframe.drop('actuals', axis=1), train_dataframe['actuals'])
-
-np.mean(cross_val_score(meta_model, train_dataframe.drop(['actuals'], axis=1),
-                        train_dataframe['actuals'], scoring='neg_mean_squared_log_error'))
-meta_model.coef_
-
-predictions = pd.DataFrame(meta_model.predict(test_dataframe))
-predictions.to_csv("E:/Kaggle_Problem/Flight Ticket Prediction/meta_model_.csv", index=False)
-
-
 
 
 
